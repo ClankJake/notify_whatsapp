@@ -4,7 +4,6 @@
 """
 1. Install the requests and Pillow modules for python.
        pip install requests
-       pip install pillow
 
 Tautulli > Settings > Notification Agents > Scripts > Bell icon:
         [X] Notify on Recently Added
