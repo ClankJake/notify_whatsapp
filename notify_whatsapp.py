@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-1. Install the requests and Pillow modules for python.
+1. Install the requests module for python.
        pip install requests
 
 Tautulli > Settings > Notification Agents > Scripts > Bell icon:
@@ -75,6 +75,8 @@ def build_arguments():
 
     # Lista de argumentos
     arguments = [
+        ('-servn', '--server_name', 'Server Name', '', None),
+        ('-ds', '--datestamp', 'Server Name', '', None),
         ('-med', '--media_type', 'Media type (e.g., movie, episode)', '', None),
         ('-tt', '--title', 'Media title', '', None),
         ('-sn', '--show_name', 'TV show name', '', None),
@@ -89,7 +91,15 @@ def build_arguments():
         ('-lname', '--library_name', 'Library name', '', None),
         ('-pos', '--poster', 'Poster URL', '', None),
         ('-cr', '--content_rating', 'Content Rating', '', None),
+        ('-st', '--studio', 'Studio', '', None),
+        ('-di', '--directors', 'Directors', '', None),
+        ('-ac', '--actors', 'Actors', '', None),
+        ('-dt', '--duration_time', 'Duration Time', '', None),
+        ('-vw', '--video_width', 'Video Width', '', None),
+        ('-vh', '--video_height', 'Video Height', '', None),
         ('-vr', '--video_resolution', 'Video Resolution', '', None),
+        ('-fs', '--file_size', 'File Size', '', None),
+        ('-sy', '--show_year', 'Show Year', '', None),
         ('-log', '--log_enabled', 'Enable logging', False, 'store_true'),
     ]
 
@@ -138,7 +148,10 @@ if __name__ == '__main__':
         season_num=args.season_num, episode_num=args.episode_num, duration=args.duration,
         genres=args.genres, rating=args.rating, summary=args.summary, year=args.year,
         library_name=args.library_name, video_resolution=args.video_resolution, 
-        content_rating=args.content_rating
+        content_rating=args.content_rating, studio=args.studio, directors=args.directors,
+        actors=args.actors, duration_time=args.duration_time, video_width=args.video_width,
+        video_height=args.video_height, file_size=args.file_size, server_name=args.server_name,
+		datestamp=args.datestamp, show_year=args.show_year
     )
 
     parsed_url = urlparse(args.poster)
