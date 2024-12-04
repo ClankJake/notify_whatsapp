@@ -26,7 +26,7 @@ from urllib.parse import urlparse
 # Configurações gerais
 CONFIG = {
     "webhook_url": 'http://you_ip:3000/send/image',
-    "phone": 'you_id@s.whatsapp.net', # Para Canal: @newsletter, Grupo: g.us, Privado: @s.whatsapp.net
+    "phone": 'you_id@s.whatsapp.net', # Para Canal: @newsletter, Grupo: @g.us, Privado: @s.whatsapp.net
     "log_file_path": '/config/notify_whatsapp.log',
     "retry_delay": 10,
     "max_retries": 3
