@@ -151,7 +151,7 @@ if __name__ == '__main__':
         content_rating=args.content_rating, studio=args.studio, directors=args.directors,
         actors=args.actors, duration_time=args.duration_time, video_width=args.video_width,
         video_height=args.video_height, file_size=args.file_size, server_name=args.server_name,
-		datestamp=args.datestamp, show_year=args.show_year
+        datestamp=args.datestamp, show_year=args.show_year
     )
 
     parsed_url = urlparse(args.poster)
