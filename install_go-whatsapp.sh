@@ -65,7 +65,7 @@ mkdir -p "$WORK_DIR"
 chown "$CURRENT_USER:$CURRENT_GROUP" "$WORK_DIR"
 
 log "Configurando o serviço systemd..."
-printf "[Unit]\nDescription=Go WhatsApp Web Multi-Device\nAfter=network.target\n\n[Service]\nExecStart=$BIN_PATH --basic-auth\nRestart=on-failure\nUser=$CURRENT_USER\nGroup=$CURRENT_GROUP\nWorkingDirectory=$WORK_DIR\nStandardOutput=journal\nStandardError=journal\nEnvironment=\"PORT=$PORT\"\n\n[Install]\nWantedBy=multi-user.target\n" > "$SERVICE_PATH"
+printf "[Unit]\nDescription=Go WhatsApp Web Multi-Device\nAfter=network.target\n\n[Service]\nExecStart=$BIN_PATH\nRestart=on-failure\nUser=$CURRENT_USER\nGroup=$CURRENT_GROUP\nWorkingDirectory=$WORK_DIR\nStandardOutput=journal\nStandardError=journal\nEnvironment=\"PORT=$PORT\"\n\n[Install]\nWantedBy=multi-user.target\n" > "$SERVICE_PATH"
 
 log "Recarregando daemon do systemd..."
 systemctl daemon-reload
