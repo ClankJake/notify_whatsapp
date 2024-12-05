@@ -12,8 +12,11 @@ Tautulli > Settings > Notification Agents > Scripts > Gear icon:
 Tautulli > Settings > Notifications > Script > Script Arguments:
         -sn {show_name} -ena {episode_name} -ssn {season_num00} -enu {episode_num00} -dur {duration}
         -med {media_type} -tt {title} -pos {poster_url} -genres {genres} -rating {rating} 
-        -summary {summary} -year {year} -lname {library_name} 
-        -vr {video_resolution} -cr {content_rating}
+        -summary {summary} -year {year} -lname {library_name} -vr {video_resolution} -cr {content_rating}
+        -servn {server_name} -ds {datestamp:DD/MM/YYYY} -st {studio} -di {directors} -ac {actors} 
+        -dt {duration_time} -vw {video_width} -vh {video_height} -fs {file_size} -sy {show_year}
+2. Optional Argument:
+        -auth -log
 """
 
 from __future__ import unicode_literals
@@ -27,11 +30,13 @@ from urllib.parse import urlparse
 CONFIG = {
     "webhook_url": 'http://you_ip:3000/send/image',
     "phone": 'you_id@s.whatsapp.net', # Para Canal: @newsletter, Grupo: @g.us, Privado: @s.whatsapp.net
+    "token": 'Basic SUA CREDENCIAL', # Opicional. Caso tenha colocado autenticao no go-whatsapp-web-multidevice
     "log_file_path": '/config/notify_whatsapp.log',
     "retry_delay": 10,
     "max_retries": 3
 }
 
+# Template Padrão caso queira modificar so fazer sua alterações.
 TEMPLATES = {
     "movie": "🎬  *Título:* {title} ({year})\n🕓  *Duração:* {duration} minutos\n🎭  *Gênero:* {genres}\n📺  *Biblioteca:* {library_name}\n\n⭐ *{rating}* | {summary}",
     "episode": "📺  *Série:* {show_name} ({year})\n🔢  *Episódio:* {season_num}x{episode_num} - {episode_name}\n🕓  *Duração:* {duration} minutos\n🎭  *Gênero:* {genres}\n📺  *Biblioteca:* {library_name}\n\n⭐ *{rating}* | {summary}",
@@ -76,7 +81,7 @@ def build_arguments():
     # Lista de argumentos
     arguments = [
         ('-servn', '--server_name', 'Server Name', '', None),
-        ('-ds', '--datestamp', 'Server Name', '', None),
+        ('-ds', '--datestamp', 'Date', '', None),
         ('-med', '--media_type', 'Media type (e.g., movie, episode)', '', None),
         ('-tt', '--title', 'Media title', '', None),
         ('-sn', '--show_name', 'TV show name', '', None),
@@ -101,6 +106,7 @@ def build_arguments():
         ('-fs', '--file_size', 'File Size', '', None),
         ('-sy', '--show_year', 'Show Year', '', None),
         ('-log', '--log_enabled', 'Enable logging', False, 'store_true'),
+        ('-auth', '--auth', 'Enable Authorization header', False, 'store_true'),
     ]
 
     # Adiciona os argumentos ao parser
@@ -113,9 +119,13 @@ def build_arguments():
     # Retorna os argumentos analisados
     return parser.parse_args()
 
-def send_webhook(body_text, image_path, log_enabled):
+def send_webhook(body_text, image_path, log_enabled, auth_enabled):
     """Send data to the webhook."""
     try:
+        headers = {}
+        if auth_enabled:
+            headers['Authorization'] = CONFIG['token']
+			
         with open(image_path, 'rb') as image_file:
             files = {'image': (image_path, image_file, 'image/jpeg')}
             data = {
@@ -124,7 +134,7 @@ def send_webhook(body_text, image_path, log_enabled):
                 'compress': 'true',
                 'view_once': 'false'
             }
-            response = requests.post(CONFIG['webhook_url'], data=data, files=files)
+            response = requests.post(CONFIG['webhook_url'], data=data, files=files, headers=headers)
             log(f"Webhook response: {response.status_code} - {response.text}", log_enabled)
             return response.status_code
     except Exception as e:
@@ -159,9 +169,9 @@ if __name__ == '__main__':
 
     # Define um nome padrão caso o arquivo não tenha nome na URL
     if not original_filename:
-        original_filename = 'temp_image.jpg'
+        original_filename = 'temp_image.png'
     elif '.' not in original_filename:
-        original_filename += '.jpg'  # Adiciona .jpg se não houver extensão
+        original_filename += '.png'  # Adiciona .png se não houver extensão
 
     original_image_path = original_filename
 
@@ -170,7 +180,7 @@ if __name__ == '__main__':
 
     # Send the webhook
     if image_downloaded:
-        send_webhook(body_text, original_filename, log_enabled)
+        send_webhook(body_text, original_filename, log_enabled, auth_enabled=args.auth)
         os.remove(original_filename)
         log("Cleaned up downloaded image", log_enabled)
 
