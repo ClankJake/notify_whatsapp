@@ -169,9 +169,9 @@ if __name__ == '__main__':
 
     # Define um nome padrão caso o arquivo não tenha nome na URL
     if not original_filename:
-        original_filename = 'temp_image.png'
+        original_filename = 'temp_image.jpg'
     elif '.' not in original_filename:
-        original_filename += '.png'  # Adiciona .png se não houver extensão
+        original_filename += '.jpg'  # Adiciona .jpg se não houver extensão
 
     original_image_path = original_filename
 
