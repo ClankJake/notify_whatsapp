@@ -6,6 +6,9 @@ BIN_PATH="/usr/local/bin/go-whatsapp-web"
 SERVICE_PATH="/etc/systemd/system/go-whatsapp-web.service"
 WORK_DIR="/var/lib/go-whatsapp-web"
 PORT="3000"
+AUTH_USER="admin"
+AUTH_PASS="caverna7"
+OS_TYPE="Chrome"
 
 # Capturando o usuário e grupo atuais
 if [ -n "$SUDO_USER" ]; then
@@ -42,6 +45,12 @@ case "$ARCH" in
     ;;
 esac
 
+# Parando o serviço se estiver rodando
+if systemctl is-active --quiet go-whatsapp-web.service; then
+  log "Parando o serviço para atualização..."
+  systemctl stop go-whatsapp-web.service
+fi
+
 # Obtendo a URL do binário mais recente
 log "Obtendo a URL do binário mais recente..."
 LATEST_URL=$(curl -sL -o /dev/null -w "%{url_effective}" "$REPO_URL" | sed "s/tag/download/" | xargs -I {} echo {}/$BIN_ARCH)
@@ -65,7 +74,23 @@ mkdir -p "$WORK_DIR"
 chown "$CURRENT_USER:$CURRENT_GROUP" "$WORK_DIR"
 
 log "Configurando o serviço systemd..."
-printf "[Unit]\nDescription=Go WhatsApp Web Multi-Device\nAfter=network.target\n\n[Service]\nExecStart=$BIN_PATH\nRestart=on-failure\nUser=$CURRENT_USER\nGroup=$CURRENT_GROUP\nWorkingDirectory=$WORK_DIR\nStandardOutput=journal\nStandardError=journal\nEnvironment=\"PORT=$PORT\"\n\n[Install]\nWantedBy=multi-user.target\n" > "$SERVICE_PATH"
+cat > "$SERVICE_PATH" <<EOF
+[Unit]
+Description=Go WhatsApp Web Multi-Device
+After=network.target
+
+[Service]
+ExecStart=$BIN_PATH rest --basic-auth=${AUTH_USER}:${AUTH_PASS} --port=${PORT} --os=${OS_TYPE} --account-validation=false
+Restart=on-failure
+User=$CURRENT_USER
+Group=$CURRENT_GROUP
+WorkingDirectory=$WORK_DIR
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
 log "Recarregando daemon do systemd..."
 systemctl daemon-reload
