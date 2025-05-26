@@ -37,6 +37,35 @@ case "$ARCH" in
     ;;
 esac
 
+SERVICE_EXISTS=false
+if [ -f "$SERVICE_PATH" ]; then
+  SERVICE_EXISTS=true
+fi
+
+if $SERVICE_EXISTS; then
+  log "Serviço já existente detectado. Atualizando binário..."
+
+  # Parar serviço
+  systemctl stop go-whatsapp-web.service
+
+  # Baixar nova versão
+  LATEST_URL=$(curl -sL -o /dev/null -w "%{url_effective}" "$REPO_URL" | sed "s/tag/download/" | xargs -I {} echo {}/$BIN_ARCH)
+  wget -q "$LATEST_URL" -O "$BIN_PATH" || {
+    echo "Erro ao baixar o binário. Verifique a URL."
+    exit 1
+  }
+
+  chmod +x "$BIN_PATH"
+
+  log "Reiniciando o serviço..."
+  systemctl daemon-reload
+  systemctl start go-whatsapp-web.service
+  systemctl status go-whatsapp-web.service --no-pager
+
+  log "✅ Atualização concluída com sucesso!"
+  exit 0
+fi
+
 # === ENTRADA INTERATIVA ===
 
 # Porta
