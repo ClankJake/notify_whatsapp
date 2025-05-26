@@ -87,21 +87,23 @@ log "Criando diretório de trabalho..."
 mkdir -p "$WORK_DIR"
 chown "$CURRENT_USER:$CURRENT_GROUP" "$WORK_DIR"
 
+# Montando linha de execução
+EXEC_COMMAND="$BIN_PATH rest $AUTH_STRING --port=$PORT --os=Chrome --account-validation=false"
+
 log "Configurando o serviço systemd..."
-cat > "$SERVICE_PATH" <<EOF
+cat <<EOF > "$SERVICE_PATH"
 [Unit]
 Description=Go WhatsApp Web Multi-Device
 After=network.target
 
 [Service]
-ExecStart=$BIN_PATH rest ${AUTH_STRING} --port=${PORT} --os=Chrome --account-validation=false
+ExecStart=$EXEC_COMMAND
 Restart=on-failure
 User=$CURRENT_USER
 Group=$CURRENT_GROUP
 WorkingDirectory=$WORK_DIR
 StandardOutput=journal
 StandardError=journal
-Environment="PORT=${PORT}"
 
 [Install]
 WantedBy=multi-user.target
