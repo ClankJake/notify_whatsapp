@@ -106,3 +106,20 @@ systemctl start go-whatsapp-web.service
 
 log "Serviço iniciado. Status:"
 systemctl status go-whatsapp-web.service --no-pager
+
+# Exibir instrução de autenticação se tiver sido usada
+if [[ "$AUTH_STRING" != "" ]]; then
+  BASIC_AUTH_RAW="${AUTH_USER}:${AUTH_PASS}"
+  BASIC_AUTH_ENCODED=$(echo -n "$BASIC_AUTH_RAW" | base64)
+  
+  echo ""
+  echo "🔐 Autenticação básica ativada:"
+  echo "  Usuário: $AUTH_USER"
+  echo "  Senha: (oculta)"
+  echo ""
+  echo "📋 Use este header em clientes que suportam autenticação HTTP Basic:"
+  echo "  Authorization: Basic $BASIC_AUTH_ENCODED"
+  echo ""
+  echo "Exemplo com curl:"
+  echo "  curl -H 'Authorization: Basic $BASIC_AUTH_ENCODED' http://localhost:$PORT/"
+fi
