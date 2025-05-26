@@ -38,19 +38,36 @@ case "$ARCH" in
     ;;
 esac
 
-# === MODO DE ATUALIZAÇÃO ===
-if [ -f "$SERVICE_PATH" ]; then
+# === PARÂMETROS ===
+NO_INTERACTIVE=false
+RESET_SERVICE=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --no-interactive)
+      NO_INTERACTIVE=true
+      ;;
+    --reset-service)
+      RESET_SERVICE=true
+      ;;
+    *)
+      echo "Opção inválida: $arg"
+      echo "Uso: $0 [--no-interactive] [--reset-service]"
+      exit 1
+      ;;
+  esac
+done
+
+# === MODO DE ATUALIZAÇÃO AUTOMÁTICA ===
+if [ -f "$SERVICE_PATH" ] && [ "$RESET_SERVICE" = false ]; then
   log "Serviço já existente detectado. Verificando versão..."
 
-  # Obter versão mais recente do GitHub
   LATEST_TAG=$(curl -sL -o /dev/null -w "%{url_effective}" "$REPO_URL" | grep -oP 'tag/\K[^/]+')
-
   if [ -z "$LATEST_TAG" ]; then
-    echo "⚠️  Não foi possível obter a versão mais recente do GitHub."
+    echo "❌ Não foi possível obter a versão mais recente."
     exit 1
   fi
 
-  # Verificar versão instalada
   INSTALLED_VERSION="none"
   if [ -f "$VERSION_FILE" ]; then
     INSTALLED_VERSION=$(cat "$VERSION_FILE")
@@ -62,93 +79,79 @@ if [ -f "$SERVICE_PATH" ]; then
   fi
 
   log "📦 Atualizando da versão $INSTALLED_VERSION para $LATEST_TAG..."
-
-  # Parar serviço
   systemctl stop go-whatsapp-web.service
 
-  # Determinar URL binário
   LATEST_URL="https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/download/$LATEST_TAG/$BIN_ARCH"
+  BACKUP_PATH="$BIN_PATH.bak.$(date +%s)"
+  [ -f "$BIN_PATH" ] && cp "$BIN_PATH" "$BACKUP_PATH" && log "🔙 Backup salvo: $BACKUP_PATH"
 
-  # Fazer backup do binário anterior
-  if [ -f "$BIN_PATH" ]; then
-    BACKUP_PATH="$BIN_PATH.bak.$(date +%s)"
-    cp "$BIN_PATH" "$BACKUP_PATH"
-    log "🔙 Backup do binário anterior salvo como: $BACKUP_PATH"
-  fi
-
-  # Baixar nova versão
   wget -q "$LATEST_URL" -O "$BIN_PATH" || {
-    echo "❌ Erro ao baixar o binário. Verifique a URL."
+    echo "❌ Falha ao baixar binário."
     exit 1
   }
 
   chmod +x "$BIN_PATH"
   echo "$LATEST_TAG" > "$VERSION_FILE"
 
-  log "🔄 Reiniciando o serviço..."
   systemctl daemon-reload
   systemctl start go-whatsapp-web.service
-  systemctl status go-whatsapp-web.service --no-pager
 
-  log "✅ Atualização concluída para versão $LATEST_TAG!"
+  log "✅ Atualizado para versão $LATEST_TAG"
   exit 0
 fi
 
-# === MODO DE INSTALAÇÃO INTERATIVA ===
-
-# Porta
-read -p "Digite a porta para o servidor (padrão: 3000): " PORT </dev/tty
-PORT=${PORT:-3000}
-
-# Autenticação
-read -p "Deseja habilitar autenticação básica (usuário e senha)? [s/N]: " USE_AUTH </dev/tty
-USE_AUTH=${USE_AUTH,,}
+# === MODO INTERATIVO OU PRIMEIRA INSTALAÇÃO ===
+PORT="3000"
 AUTH_STRING=""
 
-if [[ "$USE_AUTH" == "s" || "$USE_AUTH" == "y" ]]; then
-  read -p "Digite o nome de usuário: " AUTH_USER </dev/tty
-  read -s -p "Digite a senha: " AUTH_PASS </dev/tty
-  echo ""
+if [ "$NO_INTERACTIVE" = false ]; then
+  read -p "Digite a porta para o servidor (padrão: 3000): " INPUT_PORT </dev/tty
+  PORT=${INPUT_PORT:-3000}
 
-  if [[ -n "$AUTH_USER" && -n "$AUTH_PASS" ]]; then
-    AUTH_STRING="--basic-auth=${AUTH_USER}:${AUTH_PASS}"
-  else
-    echo "⚠️  Usuário ou senha não fornecidos. Autenticação não será ativada."
-    AUTH_STRING=""
+  read -p "Deseja habilitar autenticação básica (usuário e senha)? [s/N]: " USE_AUTH </dev/tty
+  USE_AUTH=${USE_AUTH,,}
+  if [[ "$USE_AUTH" == "s" || "$USE_AUTH" == "y" ]]; then
+    read -p "Digite o nome de usuário: " AUTH_USER </dev/tty
+    read -s -p "Digite a senha: " AUTH_PASS </dev/tty
+    echo ""
+    if [[ -n "$AUTH_USER" && -n "$AUTH_PASS" ]]; then
+      AUTH_STRING="--basic-auth=${AUTH_USER}:${AUTH_PASS}"
+    fi
   fi
+else
+  PORT="3000"
+  AUTH_STRING=""
 fi
 
-# Parar serviço se ativo
+# Parar serviço se rodando
 if systemctl is-active --quiet go-whatsapp-web.service; then
   log "Parando serviço existente..."
   systemctl stop go-whatsapp-web.service
 fi
 
-# Obter binário mais recente
-log "Baixando binário mais recente..."
-LATEST_URL=$(curl -sL -o /dev/null -w "%{url_effective}" "$REPO_URL" | sed "s/tag/download/" | xargs -I {} echo {}/$BIN_ARCH)
+# Baixar binário mais recente
+log "Baixando binário..."
+LATEST_TAG=$(curl -sL -o /dev/null -w "%{url_effective}" "$REPO_URL" | grep -oP 'tag/\K[^/]+')
+LATEST_URL="https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/download/$LATEST_TAG/$BIN_ARCH"
 
 wget -q "$LATEST_URL" -O "$BIN_PATH" || {
-  echo "❌ Erro ao baixar o binário. Verifique a URL."
+  echo "❌ Erro ao baixar binário."
   exit 1
 }
 
 chmod +x "$BIN_PATH"
-
-# Salvar versão atual
-LATEST_TAG=$(curl -sL -o /dev/null -w "%{url_effective}" "$REPO_URL" | grep -oP 'tag/\K[^/]+')
 echo "$LATEST_TAG" > "$VERSION_FILE"
 
-# Preparar diretório de trabalho
+# Criar diretório de trabalho
 mkdir -p "$WORK_DIR"
 chown "$CURRENT_USER:$CURRENT_GROUP" "$WORK_DIR"
 chmod 700 "$WORK_DIR"
 
-# Linha do ExecStart
+# Montar comando
 EXEC_COMMAND="$BIN_PATH rest $AUTH_STRING --port=$PORT --os=Chrome --account-validation=false"
 
-# Criar serviço systemd
-log "Criando serviço systemd..."
+# Criar/Recriar systemd service
+log "Criando arquivo systemd..."
 cat <<EOF > "$SERVICE_PATH"
 [Unit]
 Description=Go WhatsApp Web Multi-Device
@@ -167,7 +170,7 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
-# Ativar e iniciar serviço
+# Habilitar e iniciar serviço
 systemctl daemon-reload
 systemctl enable go-whatsapp-web.service
 systemctl start go-whatsapp-web.service
@@ -175,8 +178,8 @@ systemctl start go-whatsapp-web.service
 log "✅ Serviço iniciado. Status:"
 systemctl status go-whatsapp-web.service --no-pager
 
-# Exibir instrução de autenticação se usada
-if [[ "$AUTH_STRING" != "" ]]; then
+# Mostrar autenticação básica
+if [[ "$AUTH_STRING" != "" && "$NO_INTERACTIVE" = false ]]; then
   BASIC_AUTH_RAW="${AUTH_USER}:${AUTH_PASS}"
   BASIC_AUTH_ENCODED=$(echo -n "$BASIC_AUTH_RAW" | base64)
 
@@ -185,7 +188,7 @@ if [[ "$AUTH_STRING" != "" ]]; then
   echo "  Usuário: $AUTH_USER"
   echo "  Senha: (oculta)"
   echo ""
-  echo "📋 Use este header em clientes que suportam autenticação HTTP Basic:"
+  echo "📋 Use este header:"
   echo "  Authorization: Basic $BASIC_AUTH_ENCODED"
   echo ""
   echo "Exemplo com curl:"
