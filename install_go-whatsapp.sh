@@ -94,7 +94,7 @@ Description=Go WhatsApp Web Multi-Device
 After=network.target
 
 [Service]
-ExecStart=$BIN_PATH ${AUTH_STRING} --port=${PORT} --os=Chrome --account-validation=false
+ExecStart=$BIN_PATH rest ${AUTH_STRING} --port=${PORT} --os=Chrome --account-validation=false
 Restart=on-failure
 User=$CURRENT_USER
 Group=$CURRENT_GROUP
