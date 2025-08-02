@@ -9,6 +9,8 @@ curl -s https://raw.githubusercontent.com/ClankJake/notify_whatsapp/main/install
 
 --no-interactive: usa valores padrão sem perguntar nada (porta 3000, sem autenticação).
 
+--force-update: força atualização mesmo que tenha a ultima versão.
+
 --reset-service: força a recriação do go-whatsapp-web.service, útil para editar manualmente ou restaurar um serviço quebrado.
  
 Caso queira adicionar as flags veja o exemplo:
