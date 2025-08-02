@@ -1,11 +1,54 @@
 #!/bin/bash
 
+# Faz o script sair em caso de erro e falha em pipelines
+set -e
+set -o pipefail
+
 # Variáveis fixas
 REPO_URL="https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/latest"
 BIN_PATH="/usr/local/bin/go-whatsapp-web"
 SERVICE_PATH="/etc/systemd/system/go-whatsapp-web.service"
 WORK_DIR="/var/lib/go-whatsapp-web"
 VERSION_FILE="/usr/local/bin/go-whatsapp-web.version"
+
+# Função para exibir mensagens
+log() {
+  echo "[INFO] $1"
+}
+
+# --- BLOCO DE VERIFICAÇÕES INICIAIS ---
+
+# Verificar se é root
+if [ "$EUID" -ne 0 ]; then
+  echo "❌ Por favor, execute como root ou use sudo."
+  exit 1
+fi
+
+# Verificar dependências essenciais
+for cmd in curl wget grep id systemctl base64; do
+  if ! command -v "$cmd" &> /dev/null; then
+    echo "❌ Erro: O comando '$cmd' é necessário, mas não foi encontrado. Por favor, instale-o."
+    exit 1
+  fi
+done
+
+# --- FUNÇÕES AUXILIARES ---
+
+# Função para obter a tag mais recente do GitHub
+get_latest_tag() {
+  local tag
+  # O redirecionamento para /dev/stderr garante que a mensagem de erro não seja capturada pela variável 'tag'
+  log "Buscando a versão mais recente no GitHub..."
+  tag=$(curl -sL -o /dev/null -w "%{url_effective}" "$REPO_URL" | grep -oP 'tag/\K[^/]+')
+  if [ -z "$tag" ]; then
+    echo "❌ Não foi possível obter a versão mais recente." >&2
+    exit 1
+  fi
+  echo "$tag"
+}
+
+
+# --- LÓGICA PRINCIPAL ---
 
 # Detectar usuário real
 if [ -n "$SUDO_USER" ]; then
@@ -16,24 +59,13 @@ else
   CURRENT_GROUP=$(id -gn)
 fi
 
-# Função para exibir mensagens
-log() {
-  echo "[INFO] $1"
-}
-
-# Verificar se é root
-if [ "$EUID" -ne 0 ]; then
-  echo "Por favor, execute como root ou use sudo."
-  exit 1
-fi
-
 # Detectar arquitetura
 ARCH=$(uname -m)
 case "$ARCH" in
   "x86_64") BIN_ARCH="linux-amd64" ;;
   "aarch64") BIN_ARCH="linux-arm64" ;;
   *)
-    echo "Arquitetura $ARCH não suportada."
+    echo "❌ Arquitetura $ARCH não suportada."
     exit 1
     ;;
 esac
@@ -62,11 +94,7 @@ done
 if [ -f "$SERVICE_PATH" ] && [ "$RESET_SERVICE" = false ]; then
   log "Serviço já existente detectado. Verificando versão..."
 
-  LATEST_TAG=$(curl -sL -o /dev/null -w "%{url_effective}" "$REPO_URL" | grep -oP 'tag/\K[^/]+')
-  if [ -z "$LATEST_TAG" ]; then
-    echo "❌ Não foi possível obter a versão mais recente."
-    exit 1
-  fi
+  LATEST_TAG=$(get_latest_tag)
 
   INSTALLED_VERSION="none"
   if [ -f "$VERSION_FILE" ]; then
@@ -85,11 +113,7 @@ if [ -f "$SERVICE_PATH" ] && [ "$RESET_SERVICE" = false ]; then
   BACKUP_PATH="$BIN_PATH.bak.$(date +%s)"
   [ -f "$BIN_PATH" ] && cp "$BIN_PATH" "$BACKUP_PATH" && log "🔙 Backup salvo: $BACKUP_PATH"
 
-  wget -q "$LATEST_URL" -O "$BIN_PATH" || {
-    echo "❌ Falha ao baixar binário."
-    exit 1
-  }
-
+  wget -q "$LATEST_URL" -O "$BIN_PATH"
   chmod +x "$BIN_PATH"
   echo "$LATEST_TAG" > "$VERSION_FILE"
 
@@ -103,6 +127,8 @@ fi
 # === MODO INTERATIVO OU PRIMEIRA INSTALAÇÃO ===
 PORT="3000"
 AUTH_STRING=""
+AUTH_USER=""
+AUTH_PASS=""
 
 if [ "$NO_INTERACTIVE" = false ]; then
   read -p "Digite a porta para o servidor (padrão: 3000): " INPUT_PORT </dev/tty
@@ -130,15 +156,11 @@ if systemctl is-active --quiet go-whatsapp-web.service; then
 fi
 
 # Baixar binário mais recente
-log "Baixando binário..."
-LATEST_TAG=$(curl -sL -o /dev/null -w "%{url_effective}" "$REPO_URL" | grep -oP 'tag/\K[^/]+')
+LATEST_TAG=$(get_latest_tag)
+log "Baixando binário da versão $LATEST_TAG..."
 LATEST_URL="https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/download/$LATEST_TAG/$BIN_ARCH"
 
-wget -q "$LATEST_URL" -O "$BIN_PATH" || {
-  echo "❌ Erro ao baixar binário."
-  exit 1
-}
-
+wget -q "$LATEST_URL" -O "$BIN_PATH"
 chmod +x "$BIN_PATH"
 echo "$LATEST_TAG" > "$VERSION_FILE"
 
@@ -179,18 +201,18 @@ log "✅ Serviço iniciado. Status:"
 systemctl status go-whatsapp-web.service --no-pager
 
 # Mostrar autenticação básica
-if [[ "$AUTH_STRING" != "" && "$NO_INTERACTIVE" = false ]]; then
+if [[ -n "$AUTH_USER" && -n "$AUTH_PASS" && "$NO_INTERACTIVE" = false ]]; then
   BASIC_AUTH_RAW="${AUTH_USER}:${AUTH_PASS}"
   BASIC_AUTH_ENCODED=$(echo -n "$BASIC_AUTH_RAW" | base64)
 
   echo ""
   echo "🔐 Autenticação básica ativada:"
-  echo "  Usuário: $AUTH_USER"
-  echo "  Senha: (oculta)"
+  echo "   Usuário: $AUTH_USER"
+  echo "   Senha: (oculta)"
   echo ""
   echo "📋 Use este header:"
-  echo "  Authorization: Basic $BASIC_AUTH_ENCODED"
+  echo "   Authorization: Basic $BASIC_AUTH_ENCODED"
   echo ""
   echo "Exemplo com curl:"
-  echo "  curl -H 'Authorization: Basic $BASIC_AUTH_ENCODED' http://localhost:$PORT/"
+  echo "   curl -H 'Authorization: Basic $BASIC_AUTH_ENCODED' http://localhost:$PORT/"
 fi
