@@ -37,14 +37,38 @@ done
 # Função para obter a tag mais recente do GitHub
 get_latest_tag() {
   local tag
-  # O redirecionamento para /dev/stderr garante que a mensagem de erro não seja capturada pela variável 'tag'
   log "Buscando a versão mais recente no GitHub..."
+  # O redirecionamento para /dev/stderr garante que a mensagem de erro não seja capturada pela variável 'tag'
   tag=$(curl -sL -o /dev/null -w "%{url_effective}" "$REPO_URL" | grep -oP 'tag/\K[^/]+')
   if [ -z "$tag" ]; then
     echo "❌ Não foi possível obter a versão mais recente." >&2
     exit 1
   fi
   echo "$tag"
+}
+
+# Função para baixar o binário com verificação
+download_binary() {
+    local url="$1"
+    local destination="$2"
+
+    log "Verificando URL de download..."
+    echo "   URL: $url"
+
+    # Verifica se o URL é válido antes de tentar baixar
+    if ! curl -s --head --fail "$url" > /dev/null; then
+        echo "❌ ERRO: O arquivo de download não foi encontrado na URL acima." >&2
+        echo "   Por favor, verifique se a versão mais recente possui um binário para sua arquitetura ($BIN_ARCH)." >&2
+        exit 1
+    fi
+
+    log "Baixando binário..."
+    # Usa wget com barra de progresso e falha em caso de erro
+    if ! wget --progress=bar:force -O "$destination" "$url" 2>&1 | grep -v 'ETA'; then
+        echo "❌ ERRO: Falha ao baixar o binário de $url." >&2
+        exit 1
+    fi
+    log "✅ Download concluído."
 }
 
 
@@ -113,7 +137,8 @@ if [ -f "$SERVICE_PATH" ] && [ "$RESET_SERVICE" = false ]; then
   BACKUP_PATH="$BIN_PATH.bak.$(date +%s)"
   [ -f "$BIN_PATH" ] && cp "$BIN_PATH" "$BACKUP_PATH" && log "🔙 Backup salvo: $BACKUP_PATH"
 
-  wget -q "$LATEST_URL" -O "$BIN_PATH"
+  download_binary "$LATEST_URL" "$BIN_PATH"
+  
   chmod +x "$BIN_PATH"
   echo "$LATEST_TAG" > "$VERSION_FILE"
 
@@ -157,10 +182,11 @@ fi
 
 # Baixar binário mais recente
 LATEST_TAG=$(get_latest_tag)
-log "Baixando binário da versão $LATEST_TAG..."
+log "Iniciando instalação da versão $LATEST_TAG..."
 LATEST_URL="https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/download/$LATEST_TAG/$BIN_ARCH"
 
-wget -q "$LATEST_URL" -O "$BIN_PATH"
+download_binary "$LATEST_URL" "$BIN_PATH"
+
 chmod +x "$BIN_PATH"
 echo "$LATEST_TAG" > "$VERSION_FILE"
 
