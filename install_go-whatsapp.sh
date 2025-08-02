@@ -47,7 +47,7 @@ get_latest_tag() {
   echo "$tag"
 }
 
-# Função para baixar o binário com verificação
+# Função para baixar o binário com verificação e progresso confiável
 download_binary() {
     local url="$1"
     local destination="$2"
@@ -63,8 +63,9 @@ download_binary() {
     fi
 
     log "Baixando binário..."
-    # Usa wget com barra de progresso e falha em caso de erro
-    if ! wget --progress=bar:force -O "$destination" "$url" 2>&1 | grep -v 'ETA'; then
+    # Usa wget com --show-progress, que é mais confiável para exibir o progresso sem travar.
+    # A verificação do código de saída é suficiente para detectar falhas.
+    if ! wget --show-progress -O "$destination" "$url"; then
         echo "❌ ERRO: Falha ao baixar o binário de $url." >&2
         exit 1
     fi
