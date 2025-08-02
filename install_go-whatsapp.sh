@@ -11,23 +11,23 @@ SERVICE_PATH="/etc/systemd/system/go-whatsapp-web.service"
 WORK_DIR="/var/lib/go-whatsapp-web"
 VERSION_FILE="/usr/local/bin/go-whatsapp-web.version"
 
-# Função para exibir mensagens
+# Função para exibir mensagens de log no standard error para não interferir com a saída de dados
 log() {
-  echo "[INFO] $1"
+  echo "[INFO] $1" >&2
 }
 
 # --- BLOCO DE VERIFICAÇÕES INICIAIS ---
 
 # Verificar se é root
 if [ "$EUID" -ne 0 ]; then
-  echo "❌ Por favor, execute como root ou use sudo."
+  echo "❌ Por favor, execute como root ou use sudo." >&2
   exit 1
 fi
 
 # Verificar dependências essenciais
 for cmd in curl wget grep id systemctl base64; do
   if ! command -v "$cmd" &> /dev/null; then
-    echo "❌ Erro: O comando '$cmd' é necessário, mas não foi encontrado. Por favor, instale-o."
+    echo "❌ Erro: O comando '$cmd' é necessário, mas não foi encontrado. Por favor, instale-o." >&2
     exit 1
   fi
 done
@@ -38,22 +38,22 @@ done
 get_latest_tag() {
   local tag
   log "Buscando a versão mais recente no GitHub..."
-  # O redirecionamento para /dev/stderr garante que a mensagem de erro não seja capturada pela variável 'tag'
   tag=$(curl -sL -o /dev/null -w "%{url_effective}" "$REPO_URL" | grep -oP 'tag/\K[^/]+')
   if [ -z "$tag" ]; then
     echo "❌ Não foi possível obter a versão mais recente." >&2
     exit 1
   fi
+  # Apenas a tag é enviada para o standard output para ser capturada
   echo "$tag"
 }
 
-# Função para baixar o binário com verificação e progresso confiável
+# Função para baixar o binário usando curl para maior robustez
 download_binary() {
     local url="$1"
     local destination="$2"
 
     log "Verificando URL de download..."
-    echo "   URL: $url"
+    echo "   URL: $url" >&2
 
     # Verifica se o URL é válido antes de tentar baixar
     if ! curl -s --head --fail "$url" > /dev/null; then
@@ -63,10 +63,11 @@ download_binary() {
     fi
 
     log "Baixando binário..."
-    # Usa wget com --show-progress, que é mais confiável para exibir o progresso sem travar.
-    # A verificação do código de saída é suficiente para detectar falhas.
-    if ! wget --show-progress -O "$destination" "$url"; then
+    # Usa curl para baixar: -L segue redirecionamentos, -f falha em erros de servidor, -# mostra barra de progresso.
+    if ! curl -L -f -# -o "$destination" "$url"; then
         echo "❌ ERRO: Falha ao baixar o binário de $url." >&2
+        # Limpa o arquivo parcial que o curl pode ter deixado
+        rm -f "$destination"
         exit 1
     fi
     log "✅ Download concluído."
@@ -90,7 +91,7 @@ case "$ARCH" in
   "x86_64") BIN_ARCH="linux-amd64" ;;
   "aarch64") BIN_ARCH="linux-arm64" ;;
   *)
-    echo "❌ Arquitetura $ARCH não suportada."
+    echo "❌ Arquitetura $ARCH não suportada." >&2
     exit 1
     ;;
 esac
@@ -108,8 +109,8 @@ for arg in "$@"; do
       RESET_SERVICE=true
       ;;
     *)
-      echo "Opção inválida: $arg"
-      echo "Uso: $0 [--no-interactive] [--reset-service]"
+      echo "Opção inválida: $arg" >&2
+      echo "Uso: $0 [--no-interactive] [--reset-service]" >&2
       exit 1
       ;;
   esac
