@@ -24,7 +24,7 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-# Verificar dependências essenciais, incluindo unzip
+# Verificar dependências essenciais
 for cmd in curl unzip grep id systemctl base64; do
   if ! command -v "$cmd" &> /dev/null; then
     echo "❌ Erro: O comando '$cmd' é necessário, mas não foi encontrado. Por favor, instale-o (ex: sudo apt install $cmd)." >&2
@@ -75,15 +75,24 @@ download_and_extract_binary() {
     fi
 
     log "Extraindo binário..."
-    # O executável dentro do ZIP chama-se 'whatsapp'
-    if ! unzip -o "$tmp_dir/$filename" "whatsapp" -d "$tmp_dir"; then
+    # Detecta o nome do executável, ignorando arquivos de texto como readme.md
+    local executable_name
+    executable_name=$(unzip -Z -1 "$tmp_dir/$filename" | grep -v -i -E 'readme.md|LICENSE' | head -n 1)
+    if [ -z "$executable_name" ]; then
+        echo "❌ ERRO: Não foi possível encontrar um arquivo executável dentro do ZIP." >&2
+        rm -rf "$tmp_dir"
+        exit 1
+    fi
+    
+    log "Nome do executável detectado: $executable_name"
+    if ! unzip -o "$tmp_dir/$filename" "$executable_name" -d "$tmp_dir"; then
         echo "❌ ERRO: Falha ao extrair o binário do arquivo ZIP." >&2
         rm -rf "$tmp_dir"
         exit 1
     fi
 
     log "Instalando binário em $final_destination..."
-    if ! mv "$tmp_dir/whatsapp" "$final_destination"; then
+    if ! mv "$tmp_dir/$executable_name" "$final_destination"; then
         echo "❌ ERRO: Falha ao mover o binário para o destino." >&2
         rm -rf "$tmp_dir"
         exit 1
@@ -122,6 +131,7 @@ esac
 # === PARÂMETROS ===
 NO_INTERACTIVE=false
 RESET_SERVICE=false
+FORCE_UPDATE=false
 
 for arg in "$@"; do
   case "$arg" in
@@ -131,9 +141,12 @@ for arg in "$@"; do
     --reset-service)
       RESET_SERVICE=true
       ;;
+    --force-update)
+      FORCE_UPDATE=true
+      ;;
     *)
       echo "Opção inválida: $arg" >&2
-      echo "Uso: $0 [--no-interactive] [--reset-service]" >&2
+      echo "Uso: $0 [--no-interactive] [--reset-service] [--force-update]" >&2
       exit 1
       ;;
   esac
@@ -141,7 +154,11 @@ done
 
 # === MODO DE ATUALIZAÇÃO AUTOMÁTICA ===
 if [ -f "$SERVICE_PATH" ] && [ "$RESET_SERVICE" = false ]; then
-  log "Serviço já existente detectado. Verificando versão..."
+  if [ "$FORCE_UPDATE" = true ]; then
+    log "⚠️  Forçando a reinstalação da versão mais recente..."
+  else
+    log "Serviço já existente detectado. Verificando versão..."
+  fi
 
   LATEST_TAG=$(get_latest_tag)
 
@@ -150,12 +167,19 @@ if [ -f "$SERVICE_PATH" ] && [ "$RESET_SERVICE" = false ]; then
     INSTALLED_VERSION=$(cat "$VERSION_FILE")
   fi
 
-  if [ "$INSTALLED_VERSION" == "$LATEST_TAG" ]; then
+  # Pular verificação de versão se --force-update for usado
+  if [ "$INSTALLED_VERSION" == "$LATEST_TAG" ] && [ "$FORCE_UPDATE" = false ]; then
     log "✅ Já está na versão mais recente: $INSTALLED_VERSION"
+    log "   (Use --force-update para reinstalar a mesma versão)"
     exit 0
   fi
 
-  log "📦 Atualizando da versão $INSTALLED_VERSION para $LATEST_TAG..."
+  if [ "$FORCE_UPDATE" = true ] && [ "$INSTALLED_VERSION" == "$LATEST_TAG" ]; then
+      log "📦 Reinstalando a versão $LATEST_TAG..."
+  else
+      log "📦 Atualizando da versão $INSTALLED_VERSION para $LATEST_TAG..."
+  fi
+  
   systemctl stop go-whatsapp-web.service
 
   VERSION_NUM=${LATEST_TAG#v} # Remove o prefixo 'v' (ex: v7.3.1 -> 7.3.1)
