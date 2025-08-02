@@ -2,83 +2,54 @@
 # -*- coding: utf-8 -*-
 
 """
-1. Install the requests module for python.
-       pip install requests
+1. Instale o módulo requests para python.
+      pip install requests
 
 Tautulli > Settings > Notification Agents > Scripts > Bell icon:
-        [X] Notify on Recently Added
+      [X] Notify on Recently Added
 Tautulli > Settings > Notification Agents > Scripts > Gear icon:
-        Playback Recently Added: webhook_notify.py
+      Playback Recently Added: webhook_notify_url.py
 Tautulli > Settings > Notifications > Script > Script Arguments:
-        -sn {show_name} -ena {episode_name} -ssn {season_num00} -enu {episode_num00} -dur {duration}
-        -med {media_type} -tt {title} -pos {poster_url} -genres {genres} -rating {rating} 
-        -summary {summary} -year {year} -lname {library_name} -vr {video_resolution} -cr {content_rating}
-        -servn {server_name} -ds {datestamp:DD/MM/YYYY} -st {studio} -di {directors} -ac {actors} 
-        -dt {duration_time} -vw {video_width} -vh {video_height} -fs {file_size} -sy {show_year}
-2. Optional Argument:
-        -auth -log
+      -sn {show_name} -ena {episode_name} -ssn {season_num00} -enu {episode_num00} -dur {duration}
+      -med {media_type} -tt {title} -pos {poster_url} -genres {genres} -rating {rating} 
+      -summary {summary} -year {year} -lname {library_name} -vr {video_resolution} -cr {content_rating}
+      -servn {server_name} -ds {datestamp:DD/MM/YYYY} -st {studio} -di {directors} -ac {actors} 
+      -dt {duration_time} -vw {video_width} -vh {video_height} -fs {file_size} -sy {show_year}
+2. Argumentos Opcionais:
+      -auth -log
 """
 
 from __future__ import unicode_literals
 import argparse
 import requests
-import os
 import time
-from urllib.parse import urlparse
 
-# Configurações gerais
+# --- CONFIGURAÇÕES GERAIS ---
 CONFIG = {
     "webhook_url": 'http://you_ip:3000/send/image',
     "phone": 'you_id@s.whatsapp.net', # Para Canal: @newsletter, Grupo: @g.us, Privado: @s.whatsapp.net
     "token": 'Basic SUA CREDENCIAL', # Opicional. Caso tenha colocado autenticao no go-whatsapp-web-multidevice
-    "log_file_path": '/config/notify_whatsapp.log',
-    "retry_delay": 10,
-    "max_retries": 3
+    "log_file_path": '/config/notify_whatsapp.log'
 }
 
-# Template Padrão caso queira modificar so fazer sua alterações.
+# --- TEMPLATES DE MENSAGEM ---
 TEMPLATES = {
-    "movie": "🎬  *Título:* {title} ({year})\n🕓  *Duração:* {duration} minutos\n🎭  *Gênero:* {genres}\n📺  *Biblioteca:* {library_name}\n\n⭐ *{rating}* | {summary}",
-    "episode": "📺  *Série:* {show_name} ({year})\n🔢  *Episódio:* {season_num}x{episode_num} - {episode_name}\n🕓  *Duração:* {duration} minutos\n🎭  *Gênero:* {genres}\n📺  *Biblioteca:* {library_name}\n\n⭐ *{rating}* | {summary}",
-    "show": "📺  *Séries:* {show_name} ({year})\n🎭  *Gênero:* {genres}\n📺  *Biblioteca:* {library_name}\n\n⭐ *{rating}* | {summary}",
-    "season": "📺  *Série:* {show_name}\n📺  *Temporada:* {season_num}\n🎭  *Gênero:* {genres}\n📺  *Biblioteca:* {library_name}\n\n⭐ *{rating}* | {summary}"
+    "movie": "🍿 *Título:* {title} ({year})\n🕓 *Duração:* {duration} minutos\n🎭 *Gênero:* {genres} {actors} {rating} {summary}",
+    "episode": "🍿 *Título:* {show_name} ({year})\n🔢 *Episódio:* {season_num}x{episode_num} - {episode_name}\n🕓 *Duração:* {duration} minutos\n🎭 *Gênero:* {genres} {actors} {rating} {summary}",
+    "show": "🍿 *Título:* {show_name} ({show_year})\n🎭 *Gênero:* {genres} {actors} {rating} {summary}",
+    "season": "🍿 *Título:* {show_name} ({show_year})\n🎬 *Temporada:* {season_num}\n🎭 *Gênero:* {genres} {actors} {rating} {summary}"
 }
 
 def log(message, log_enabled):
-    """Log message to file if logging is enabled."""
+    """Grava uma mensagem de log no arquivo se o log estiver ativado."""
     if log_enabled:
-        with open(CONFIG['log_file_path'], 'a') as log_file:
+        with open(CONFIG['log_file_path'], 'a', encoding='utf-8') as log_file:
             log_file.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {message}\n")
-
-def download_image(url, filename, log_enabled):
-    """Download an image from a URL."""
-    for attempt in range(CONFIG['max_retries']):
-        try:
-            response = requests.get(url, stream=True)
-            if response.status_code == 200:
-                with open(filename, 'wb') as image:
-                    for chunk in response.iter_content(1024):
-                        image.write(chunk)
-                log(f"Successfully downloaded image: {url}", log_enabled)
-                return True
-            elif response.status_code == 429:
-                log(f"Rate limited: Retrying in {CONFIG['retry_delay']} seconds...", log_enabled)
-                time.sleep(CONFIG['retry_delay'])
-            else:
-                log(f"Failed to download image: HTTP {response.status_code}", log_enabled)
-                return False
-        except Exception as e:
-            log(f"Error downloading image: {e}", log_enabled)
-            if attempt < CONFIG['max_retries'] - 1:
-                time.sleep(CONFIG['retry_delay'])
-            else:
-                return False
 
 def build_arguments():
     """Build and parse command-line arguments."""
     parser = argparse.ArgumentParser()
 
-    # Lista de argumentos
     arguments = [
         ('-servn', '--server_name', 'Server Name', '', None),
         ('-ds', '--datestamp', 'Date', '', None),
@@ -109,34 +80,31 @@ def build_arguments():
         ('-auth', '--auth', 'Enable Authorization header', False, 'store_true'),
     ]
 
-    # Adiciona os argumentos ao parser
     for short, long, help_text, default, action in arguments:
         if action:
             parser.add_argument(short, long, help=help_text, default=default, action=action)
         else:
             parser.add_argument(short, long, help=help_text, default=default)
 
-    # Retorna os argumentos analisados
     return parser.parse_args()
 
-def send_webhook(body_text, image_path, log_enabled, auth_enabled):
-    """Send data to the webhook."""
+def send_webhook(body_text, poster_url, log_enabled, auth_enabled):
+    """Envia os dados para o webhook, usando a URL da imagem com um parâmetro de extensão falso."""
     try:
         headers = {}
         if auth_enabled:
             headers['Authorization'] = CONFIG['token']
-			
-        with open(image_path, 'rb') as image_file:
-            files = {'image': (image_path, image_file, 'image/jpeg')}
-            data = {
-                'phone': CONFIG['phone'],
-                'caption': body_text,
-                'compress': 'true',
-                'view_once': 'false'
-            }
-            response = requests.post(CONFIG['webhook_url'], data=data, files=files, headers=headers)
-            log(f"Webhook response: {response.status_code} - {response.text}", log_enabled)
-            return response.status_code
+
+        multipart_data = {
+            'phone': (None, CONFIG['phone']),
+            'image_url': (None, poster_url),
+            'caption': (None, body_text),
+            'compress': (None, 'true')
+        }
+
+        response = requests.post(CONFIG['webhook_url'], files=multipart_data, headers=headers)
+        log(f"Webhook response: {response.status_code} - {response.text}", log_enabled)
+        return response.status_code
     except Exception as e:
         log(f"Error sending webhook: {e}", log_enabled)
         return None
@@ -148,40 +116,21 @@ if __name__ == '__main__':
     log("Script started", log_enabled)
     log(f"Arguments: {args}", log_enabled)
 
+    if not args.poster:
+        log("Poster URL is missing. Cannot send notification.", log_enabled)
+        exit()
+        
     if args.media_type not in TEMPLATES:
-        log("Unsupported media type", log_enabled)
+        log(f"Unsupported media type: {args.media_type}", log_enabled)
         exit()
 
-    # Prepare the body text
-    body_text = TEMPLATES[args.media_type].format(
-        title=args.title, show_name=args.show_name, episode_name=args.episode_name,
-        season_num=args.season_num, episode_num=args.episode_num, duration=args.duration,
-        genres=args.genres, rating=args.rating, summary=args.summary, year=args.year,
-        library_name=args.library_name, video_resolution=args.video_resolution, 
-        content_rating=args.content_rating, studio=args.studio, directors=args.directors,
-        actors=args.actors, duration_time=args.duration_time, video_width=args.video_width,
-        video_height=args.video_height, file_size=args.file_size, server_name=args.server_name,
-        datestamp=args.datestamp, show_year=args.show_year
-    )
+    from collections import defaultdict
+    format_args = defaultdict(str, vars(args))
+    body_text = TEMPLATES[args.media_type].format_map(format_args)
 
-    parsed_url = urlparse(args.poster)
-    original_filename = os.path.basename(parsed_url.path)
+    poster_url_for_api = f"{args.poster}.png"
+    log(f"Using modified URL for API: {poster_url_for_api}", log_enabled)
 
-    # Define um nome padrão caso o arquivo não tenha nome na URL
-    if not original_filename:
-        original_filename = 'temp_image.jpg'
-    elif '.' not in original_filename:
-        original_filename += '.jpg'  # Adiciona .jpg se não houver extensão
-
-    original_image_path = original_filename
-
-    # Faz o download da imagem
-    image_downloaded = download_image(args.poster, original_image_path, log_enabled=args.log_enabled)
-
-    # Send the webhook
-    if image_downloaded:
-        send_webhook(body_text, original_filename, log_enabled, auth_enabled=args.auth)
-        os.remove(original_filename)
-        log("Cleaned up downloaded image", log_enabled)
+    send_webhook(body_text, poster_url_for_api, log_enabled, auth_enabled=args.auth)
 
     log("Script completed", log_enabled)
