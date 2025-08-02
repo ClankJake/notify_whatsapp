@@ -24,10 +24,10 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-# Verificar dependências essenciais
-for cmd in curl wget grep id systemctl base64; do
+# Verificar dependências essenciais, incluindo unzip
+for cmd in curl unzip grep id systemctl base64; do
   if ! command -v "$cmd" &> /dev/null; then
-    echo "❌ Erro: O comando '$cmd' é necessário, mas não foi encontrado. Por favor, instale-o." >&2
+    echo "❌ Erro: O comando '$cmd' é necessário, mas não foi encontrado. Por favor, instale-o (ex: sudo apt install $cmd)." >&2
     exit 1
   fi
 done
@@ -47,10 +47,15 @@ get_latest_tag() {
   echo "$tag"
 }
 
-# Função para baixar o binário usando curl para maior robustez
-download_binary() {
+# Função para baixar e extrair o binário de um arquivo ZIP
+download_and_extract_binary() {
     local url="$1"
-    local destination="$2"
+    local final_destination="$2"
+    local filename
+    filename=$(basename "$url")
+    # Cria um diretório temporário seguro
+    local tmp_dir
+    tmp_dir=$(mktemp -d)
 
     log "Verificando URL de download..."
     echo "   URL: $url" >&2
@@ -58,19 +63,35 @@ download_binary() {
     # Verifica se o URL é válido antes de tentar baixar
     if ! curl -s --head --fail "$url" > /dev/null; then
         echo "❌ ERRO: O arquivo de download não foi encontrado na URL acima." >&2
-        echo "   Por favor, verifique se a versão mais recente possui um binário para sua arquitetura ($BIN_ARCH)." >&2
+        echo "   Por favor, verifique se a versão mais recente possui um binário para sua arquitetura." >&2
         exit 1
     fi
 
-    log "Baixando binário..."
-    # Usa curl para baixar: -L segue redirecionamentos, -f falha em erros de servidor, -# mostra barra de progresso.
-    if ! curl -L -f -# -o "$destination" "$url"; then
-        echo "❌ ERRO: Falha ao baixar o binário de $url." >&2
-        # Limpa o arquivo parcial que o curl pode ter deixado
-        rm -f "$destination"
+    log "Baixando arquivo ZIP..."
+    if ! curl -L -f -# -o "$tmp_dir/$filename" "$url"; then
+        echo "❌ ERRO: Falha ao baixar o arquivo ZIP de $url." >&2
+        rm -rf "$tmp_dir"
         exit 1
     fi
-    log "✅ Download concluído."
+
+    log "Extraindo binário..."
+    # O executável dentro do ZIP chama-se 'whatsapp'
+    if ! unzip -o "$tmp_dir/$filename" "whatsapp" -d "$tmp_dir"; then
+        echo "❌ ERRO: Falha ao extrair o binário do arquivo ZIP." >&2
+        rm -rf "$tmp_dir"
+        exit 1
+    fi
+
+    log "Instalando binário em $final_destination..."
+    if ! mv "$tmp_dir/whatsapp" "$final_destination"; then
+        echo "❌ ERRO: Falha ao mover o binário para o destino." >&2
+        rm -rf "$tmp_dir"
+        exit 1
+    fi
+
+    log "Limpando arquivos temporários..."
+    rm -rf "$tmp_dir"
+    log "✅ Binário instalado com sucesso."
 }
 
 
@@ -85,11 +106,13 @@ else
   CURRENT_GROUP=$(id -gn)
 fi
 
-# Detectar arquitetura
+# Detectar arquitetura para o novo formato de nome de arquivo
+OS_NAME="linux"
 ARCH=$(uname -m)
 case "$ARCH" in
-  "x86_64") BIN_ARCH="linux-amd64" ;;
-  "aarch64") BIN_ARCH="linux-arm64" ;;
+  "x86_64") BIN_ARCH="amd64" ;;
+  "aarch64") BIN_ARCH="arm64" ;;
+  "i386" | "i686") BIN_ARCH="386" ;;
   *)
     echo "❌ Arquitetura $ARCH não suportada." >&2
     exit 1
@@ -135,11 +158,14 @@ if [ -f "$SERVICE_PATH" ] && [ "$RESET_SERVICE" = false ]; then
   log "📦 Atualizando da versão $INSTALLED_VERSION para $LATEST_TAG..."
   systemctl stop go-whatsapp-web.service
 
-  LATEST_URL="https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/download/$LATEST_TAG/$BIN_ARCH"
+  VERSION_NUM=${LATEST_TAG#v} # Remove o prefixo 'v' (ex: v7.3.1 -> 7.3.1)
+  FILENAME="whatsapp_${VERSION_NUM}_${OS_NAME}_${BIN_ARCH}.zip"
+  LATEST_URL="https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/download/$LATEST_TAG/$FILENAME"
+  
   BACKUP_PATH="$BIN_PATH.bak.$(date +%s)"
   [ -f "$BIN_PATH" ] && cp "$BIN_PATH" "$BACKUP_PATH" && log "🔙 Backup salvo: $BACKUP_PATH"
 
-  download_binary "$LATEST_URL" "$BIN_PATH"
+  download_and_extract_binary "$LATEST_URL" "$BIN_PATH"
   
   chmod +x "$BIN_PATH"
   echo "$LATEST_TAG" > "$VERSION_FILE"
@@ -185,9 +211,11 @@ fi
 # Baixar binário mais recente
 LATEST_TAG=$(get_latest_tag)
 log "Iniciando instalação da versão $LATEST_TAG..."
-LATEST_URL="https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/download/$LATEST_TAG/$BIN_ARCH"
+VERSION_NUM=${LATEST_TAG#v}
+FILENAME="whatsapp_${VERSION_NUM}_${OS_NAME}_${BIN_ARCH}.zip"
+LATEST_URL="https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/download/$LATEST_TAG/$FILENAME"
 
-download_binary "$LATEST_URL" "$BIN_PATH"
+download_and_extract_binary "$LATEST_URL" "$BIN_PATH"
 
 chmod +x "$BIN_PATH"
 echo "$LATEST_TAG" > "$VERSION_FILE"
