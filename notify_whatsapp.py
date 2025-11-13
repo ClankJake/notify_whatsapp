@@ -87,6 +87,7 @@ LANGUAGE_CODES = {
     'ita': 'Italiano',
     'kor': 'Coreano',
     'chi': 'Chinês',
+    'zho': 'Chinês',
     'rus': 'Russo',
     'und': 'Indefinido',
     
