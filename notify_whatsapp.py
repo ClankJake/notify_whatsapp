@@ -104,7 +104,8 @@ LANGUAGE_CODES = {
     'rum': 'Romeno',
     'ukr': 'Ucraniano',
     'tur': 'Turco',
-    
+    'fra': 'Francês',
+
     # Adicionais (Ásia/Outros)
     'ara': 'Árabe',
     'hin': 'Hindi',
