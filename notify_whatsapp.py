@@ -113,6 +113,7 @@ LANGUAGE_CODES = {
     'heb': 'Hebraico',
     'vie': 'Vietnamita',
     'ind': 'Indonésio',
+    'srp': 'Sérvio',
     
     # Adicione mais códigos de 3 letras conforme necessário
     
@@ -130,6 +131,7 @@ LANGUAGE_CODES = {
     'nl': 'Holandês',
     'pl': 'Polonês',
     'sv': 'Sueco',
+    'sr': 'Sérvio',
     'no': 'Norueguês',
     'fi': 'Finlandês',
     'da': 'Dinamarquês',
