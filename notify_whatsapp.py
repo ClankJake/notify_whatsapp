@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""
+r"""
 Script de notificação Tautulli para WhatsApp e Telegram com informações de áudio.
 
 1. Instale o módulo requests para python:
@@ -109,7 +109,8 @@ LANGUAGE_CODES = {
     'fin': 'Finlandês', 'dan': 'Dinamarquês', 'gre': 'Grego', 'cze': 'Tcheco',
     'hun': 'Húngaro', 'rum': 'Romeno', 'ukr': 'Ucraniano', 'tur': 'Turco',
     'fra': 'Francês', 'ara': 'Árabe', 'hin': 'Hindi', 'tha': 'Tailandês',
-    'heb': 'Hebraico', 'vie': 'Vietnamita', 'ind': 'Indonésio', 'srp': 'Sérvio',
+    'heb': 'Hebraico', 'vie': 'Vietnamita',
+    'ind': 'Indonésio', 'srp': 'Sérvio', 'nob': 'Bokmål norueguês',
     'pt': 'Português', 'en': 'Inglês', 'ja': 'Japonês', 'es': 'Espanhol',
     'fr': 'Francês', 'de': 'Alemão', 'it': 'Italiano', 'ko': 'Coreano',
     'zh': 'Chinês', 'ru': 'Russo', 'nl': 'Holandês', 'pl': 'Polonês',
