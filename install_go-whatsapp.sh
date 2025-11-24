@@ -250,7 +250,7 @@ chown "$CURRENT_USER:$CURRENT_GROUP" "$WORK_DIR"
 chmod 700 "$WORK_DIR"
 
 # Montar comando
-EXEC_COMMAND="$BIN_PATH rest $AUTH_STRING --port=$PORT --os=Chrome --account-validation=false"
+EXEC_COMMAND="$BIN_PATH rest $AUTH_STRING --port=$PORT --os=Chrome --account-validation=false --trusted-proxies="0.0.0.0/0" --auto-download-media=false"
 
 # Criar/Recriar systemd service
 log "Criando arquivo systemd..."
